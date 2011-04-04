@@ -1,0 +1,149 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include "ErrorExceptions.h"
+#include "macros_and_parameters.h"
+#include "typedefs.h"
+#include "global_data.h"
+#include "PhotonPackage.h"
+
+/* Find super source leaf in the binary tree, given a photon package.
+   Search by position and photon radius. */
+
+/* Travel down the tree until a child leaf is found with a clustering
+   radius smaller than the merging radius of the photon. */
+
+/* ONLY VALID FOR MAX_LEAF=2! (i.e. binary tree) */
+
+int FindSuperSourceByPosition(PhotonPackageEntry **PP)
+{
+
+  int i, dim_search, loop_count = 0, found = FALSE;
+  SuperSourceEntry *temp = OldSourceClusteringTree;
+  float SearchRadius;  // min clustering search radius
+  SearchRadius = 0.5*(*PP)->Radius / RadiativeTransferPhotonMergeRadius;
+
+  while (1) {
+
+    if (temp == NULL) {
+      ENZO_VFAIL("FindSuperSourceByPosition: NULL leaf in clustering tree.  "
+	      "This shouldn't happen. LeafID = %"ISYM"\n", temp->LeafID)
+    }
+
+    //dim_search = loop_count % MAX_DIMENSION;
+    dim_search = temp->LeafID % MAX_DIMENSION;
+
+    // Left leaf
+    if ((*PP)->SourcePosition[dim_search] < temp->Position[dim_search]) {
+      if (temp->ChildSource[0] == NULL)
+	break;
+      if (temp->ChildSource[0]->ClusteringRadius < SearchRadius)
+	break;
+      temp = temp->ChildSource[0];
+    } // ENDIF left leaf
+
+    // Right leaf
+    else {
+      if (temp->ChildSource[1] == NULL)
+	break;
+      if (temp->ChildSource[1]->ClusteringRadius < SearchRadius)
+
+	break;
+      temp = temp->ChildSource[1];
+    } // ENDELSE right left
+    
+    loop_count++;
+
+  } // ENDWHILE
+
+  (*PP)->CurrentSource = temp;
+  
+  return SUCCESS;
+
+}
+
+/**********************************************************************/
+// Overloaded function with a position instead of a photon package as
+// the input.  Using the new clustering tree.
+
+int FindSuperSourceByPosition(FLOAT *pos, SuperSourceEntry **result,
+			      int DEBUG)
+{
+
+  int i, dim, dim_search, loop_count = 0;
+  SuperSourceEntry *temp = SourceClusteringTree;
+  float merge_inv = 0.5 / RadiativeTransferPhotonMergeRadius;
+  FLOAT SearchRadius;  // min clustering search radius
+  FLOAT dx;
+  //SearchRadius = 0.5*(*PP)->Radius / RadiativeTransferPhotonMergeRadius;
+
+  while (1) {
+
+    if (temp == NULL) {
+      ENZO_VFAIL("FindSuperSourceByPosition: NULL leaf in clustering tree.  "
+	      "This shouldn't happen. LeafID = %"ISYM"\n", temp->LeafID)
+    }
+
+    //dim_search = loop_count % MAX_DIMENSION;
+    if (temp->LeafID >= 0)
+      dim_search = temp->LeafID % MAX_DIMENSION;
+    else
+      dim_search = temp->ParentSource->LeafID % MAX_DIMENSION;
+
+    if (DEBUG)
+      printf("leaf %d: dim = %d, pos = %f %f %f, leafpos = %f %f %f\n",
+	     temp->LeafID, dim_search, pos[0], pos[1], pos[2],
+	     temp->Position[0], temp->Position[1],
+	     temp->Position[2]);
+
+    // Left leaf
+    if (pos[dim_search] < temp->Position[dim_search]) {
+      if (DEBUG) printf("--> Picking left leaf\n");
+      if (temp->ChildSource[0] == NULL)
+	break;
+      // Compute distance from position to the first child
+      SearchRadius = 0.0;
+      for (dim = 0; dim < MAX_DIMENSION; dim++) {
+	dx = pos[dim] - temp->ChildSource[0]->Position[dim];
+	SearchRadius += dx*dx;
+      }
+      SearchRadius = merge_inv * sqrt(SearchRadius);
+      if (DEBUG)
+	printf("->> cluster_radius = %g, search = %g\n",
+	       temp->ChildSource[0]->ClusteringRadius, SearchRadius);
+      if (temp->ChildSource[0]->ClusteringRadius < SearchRadius &&
+	  temp->ChildSource[0]->ClusteringRadius > 0)
+	break;
+      temp = temp->ChildSource[0];
+    } // ENDIF left leaf
+
+    // Right leaf
+    else {
+      if (DEBUG) printf("--> Picking right leaf\n");
+      if (temp->ChildSource[1] == NULL)
+	break;
+      // Compute distance from position to the second child
+      SearchRadius = 0.0;
+      for (dim = 0; dim < MAX_DIMENSION; dim++) {
+	dx = pos[dim] - temp->ChildSource[1]->Position[dim];
+	SearchRadius += dx*dx;
+      }
+      SearchRadius = merge_inv * sqrt(SearchRadius);
+      if (DEBUG)
+	printf("->> cluster_radius = %g, search = %g\n",
+	       temp->ChildSource[1]->ClusteringRadius, SearchRadius);
+      if (temp->ChildSource[1]->ClusteringRadius < SearchRadius &&
+	  temp->ChildSource[1]->ClusteringRadius > 0)
+	break;
+      temp = temp->ChildSource[1];
+    } // ENDELSE right left
+    
+    loop_count++;
+
+  } // ENDWHILE
+
+  *result = temp;
+  
+  return SUCCESS;
+
+}
