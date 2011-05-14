@@ -63,9 +63,9 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
   int GridDimension[MAX_DIMENSION];
   FLOAT EdgeOffset[MAX_DIMENSION];
   grid *grid_one, *grid_two;
-  MPI_Request *AllRequests = NULL;
   MPIBuffer *CurrentBuffer = NULL;
-  GenerateMPIRequestArray(&AllRequests);
+  //MPI_Request *AllRequests = NULL;
+  //GenerateMPIRequestArray(&AllRequests);
   TotalReceives = CommunicationMPIBuffer.size();
   
 #ifdef TRANSFER
@@ -81,6 +81,15 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 
   fluxes SubgridFluxesRefined;
 
+  list<MPIBuffer*>::iterator it;
+  for (it = CommunicationMPIBuffer.begin();
+       it != CommunicationMPIBuffer.end(); ++it) {
+    printf("P%d: index = %d, buffer = %p\n", MyProcessorNumber,
+	   (*it)->ReturnIndex(), *it);
+    printf("P%d: grid_one = %p\n", MyProcessorNumber,
+	   (*it)->ReturnGridOne());
+  }
+
   while (ReceivesCompletedToDate < TotalReceives) {
 
     /* Call the MPI wait handler. */
@@ -90,7 +99,7 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
     printf("P%d ::: BEFORE MPI_Waitsome ::: %"ISYM" %"ISYM" %"ISYM"\n", 
 	   MyProcessorNumber,
 	   TotalReceives, ReceivesCompletedToDate, NumberOfCompleteRequests);
-    MPI_Waitsome(TotalReceives, AllRequests,
+    MPI_Waitsome(TotalReceives, CommunicationReceiveMPI_Request,
 		 &NumberOfCompleteRequests, ListOfIndices, ListOfStatuses);
     printf("P%d: MPI: %"ISYM" %"ISYM" %"ISYM"\n", MyProcessorNumber,
 	   TotalReceives, 
@@ -126,7 +135,7 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 		ListOfIndices[index], 
 		CurrentHeader.CallType,
 		CurrentBuffer->ReturnGridOne()->GetGridID(),
-		AllRequests[ListOfIndices[index]]);
+		CommunicationReceiveMPI_Request[ListOfIndices[index]]);
 	fprintf(stdout, "%"ISYM": buffer = %p\n", ListOfIndices[index],
 		CurrentBuffer);
 
@@ -150,7 +159,7 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
       CurrentBuffer = GetMPIBuffer(index);
 
       if (CurrentBuffer->ReturnGridOne() != NULL &&
-	  AllRequests[index] == MPI_REQUEST_NULL) {
+	  CommunicationReceiveMPI_Request[index] == MPI_REQUEST_NULL) {
 
 	CurrentHeader = CurrentBuffer->ReturnHeader();
 	grid_one = CurrentBuffer->ReturnGridOne();
@@ -158,12 +167,11 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 	//CommunicationReceiveIndex = index;
 
 
-	fprintf(stdout, "P%d: %d %d %d %d %d %p\n", MyProcessorNumber,
+	fprintf(stdout, "P%d: %d %d %d %d %d\n", MyProcessorNumber,
 		index, CurrentBuffer->ReturnIndex(),
 		CurrentHeader.CallType,
 		CurrentBuffer->ReturnGridOne()->GetGridID(),
-		CurrentBuffer->ReturnGridTwo()->GetGridID(),
-		CurrentBuffer->ReturnRequest());
+		CurrentBuffer->ReturnGridTwo()->GetGridID());
 
 
 	/* If this depends on an un-processed receive, then skip it. */
@@ -363,6 +371,8 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
   //  printf("P(%d) out of CRH\n", MyProcessorNumber);
 
 #endif /* USE_MPI */
+
+  //delete [] AllRequests;
 
   return SUCCESS;
 
