@@ -28,6 +28,7 @@ namespace Parallel {
 
   /*----------------------------------------------------------------------*/
 
+#ifdef UNUSED
   void GenerateMPIRequestArray(MPI_Request *result[])
   {
     
@@ -44,6 +45,7 @@ namespace Parallel {
     }
 
   }
+#endif
 
   /*----------------------------------------------------------------------*/
 
@@ -60,7 +62,7 @@ namespace Parallel {
   {
     this->BufferType = MPI_DATATYPE_NULL;
     this->MessageType = MPI_DATATYPE_NULL;
-    this->request = MPI_REQUEST_NULL;
+    //this->request = MPI_REQUEST_NULL;
     this->tag = 0;
     this->grid_one = NULL;
     this->grid_two = NULL;
@@ -82,7 +84,7 @@ namespace Parallel {
 
     this->message_index = INT_UNDEFINED;
     this->message_size  = 0;
-    this->request = MPI_REQUEST_NULL;
+    //this->request = MPI_REQUEST_NULL;
     this->tag = MPI_Tag;
     this->grid_one = grid1;
     this->grid_two = grid2;
@@ -175,16 +177,17 @@ namespace Parallel {
 
   int MPIBuffer::IRecvBuffer(int FromProcessor)
   {
-    MPI_Irecv(this->message, 1, MessageType, (MPI_Arg) FromProcessor, 
-	      this->tag, MPI_COMM_WORLD, &this->request);
-    // Append to receive buffer list
 #pragma omp critical
     {
       this->message_index = CommunicationReceiveIndex++;
+      MPI_Irecv(this->message, 1, MessageType, (MPI_Arg) FromProcessor, 
+		this->tag, MPI_COMM_WORLD, 
+		CommunicationReceiveMPI_Request+this->message_index);
+      // Append to receive buffer list
       CommunicationMPIBuffer.push_back(this);
       printf("P%d: Pushing MPIBuffer (index %d) %p.  CommunicationMPIBuffer.size() = %d\n",
 	     MyProcessorNumber, this->message_index, this, CommunicationMPIBuffer.size());
-    }
+    } // ENDIF critical
     return SUCCESS;
   }
 

@@ -129,7 +129,7 @@ namespace Parallel
   EXTERN MPI_Datatype MPI_TwoInt;
   EXTERN MPI_Datatype MPI_PhotonBuffer;
 
-  //MPI_Request  CommunicationReceiveMPI_Request[MAX_RECEIVE_BUFFERS];
+  EXTERN MPI_Request  CommunicationReceiveMPI_Request[Parallel::MAX_RECEIVE_BUFFERS];
   //MPI_Datatype CommunicationReceiveMPI_Datatype[MAX_RECEIVE_BUFFERS];
   //void       *CommunicationReceiveBuffer[MAX_RECEIVE_BUFFERS];
   //int          CommunicationReceiveCallType[MAX_RECEIVE_BUFFERS];
@@ -148,7 +148,7 @@ namespace Parallel
     int message_size;
     MPI_Datatype MessageType;
     MPI_Datatype BufferType;
-    MPI_Request request;
+    //MPI_Request request;
     MPI_Arg tag;
     grid *grid_one;
     grid *grid_two;
@@ -167,7 +167,7 @@ namespace Parallel
     ~MPIBuffer(void);
 
     int ReturnIndex(void) { return message_index; };
-    MPI_Request ReturnRequest(void) { return request; };
+    //MPI_Request ReturnRequest(void) { return request; };
     void* ReturnBuffer(void) { return message->buffer; };
     mpi_header ReturnHeader(void) { return message->header; };
     grid* ReturnGridOne(void) { return grid_one; };
@@ -186,8 +186,7 @@ namespace Parallel
     public:
       RequestCompleted() {}
       bool operator()(const MPIBuffer* obj) {
-	return (obj->request == MPI_REQUEST_NULL &&
-		obj->grid_one == NULL);
+	return (obj->grid_one == NULL);
       }
     }; // ENDCLASS
 
@@ -196,7 +195,7 @@ namespace Parallel
 
   EXTERN list<MPIBuffer*> CommunicationMPIBuffer;
 
-  void GenerateMPIRequestArray(MPI_Request *result[]);
+  //void GenerateMPIRequestArray(MPI_Request *result[]);
   MPIBuffer* GetMPIBuffer(int num);
 
 #else /* USE_MPI */
