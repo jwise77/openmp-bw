@@ -300,7 +300,7 @@ int Star::FindFeedbackSphere(LevelHierarchyEntry *LevelArray[], int level,
      checking in this case, doesn't hurt...), check if the sphere is
      contained within grids on this level.  */
 
-  if (SphereContained == TRUE)
+  if (SphereContained == TRUE && FeedbackFlag != FORMATION)
     SphereContained = this->SphereContained(LevelArray, level, Radius);
 
   /* If contained and this is for star formation, we record how much
@@ -338,7 +338,7 @@ int Star::FindFeedbackSphere(LevelHierarchyEntry *LevelArray[], int level,
     // then turn it on.
     //#ifdef UNUSED
     if (StarType == PopII && this->Mass < StarClusterMinimumMass &&
-	Time-this->BirthTime > tdyn_code) {
+	Time-this->BirthTime > 0.1*tdyn_code) {
       if (debug) 
 	printf("star::FindFeedbackSphere: Old protostar: lived %g yr. "
 	       "Particle mass = %g. Star particle %"PISYM".  Turning on.\n",

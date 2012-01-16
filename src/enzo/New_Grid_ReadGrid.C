@@ -101,7 +101,7 @@ int grid::Group_ReadGrid(FILE *fptr, int GridID, HDF5_hid_t file_id,
   int ReadOnlyActive = TRUE;
   if ((ReadEverything == TRUE) || (ReadGhostZones == TRUE)) {
     ReadOnlyActive == FALSE;
-    } 
+  } 
  
   if(ReadText && HierarchyFileInputFormat == 1){
 
@@ -261,7 +261,7 @@ int grid::Group_ReadGrid(FILE *fptr, int GridID, HDF5_hid_t file_id,
       size *= GridDimension[dim];
       active_size *= ActiveDim[dim];
     }
- 
+
     //  CAUTION - are the coordinates reversed?
  
     for (int dim = 0; dim < GridRank; dim++) {

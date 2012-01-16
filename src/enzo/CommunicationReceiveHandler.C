@@ -12,6 +12,7 @@
 /           (and a record of the arguments).
 /
 ************************************************************************/
+#define NO_DEBUG
 
 #ifdef USE_MPI
 #include "mpi.h"
@@ -50,8 +51,10 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 
   CommunicationDirection = COMMUNICATION_RECEIVE;
 
-//  printf("P(%"ISYM") in CRH with %"ISYM" requests\n", MyProcessorNumber,
-//  	 CommunicationReceiveIndex);
+#ifdef DEBUG
+  printf("P(%"ISYM") in CRH with %"ISYM" requests\n", MyProcessorNumber,
+  	 CommunicationReceiveIndex);
+#endif
 
   MPI_Arg NumberOfCompleteRequests, TotalReceives;
   int ReceivesCompletedToDate = 0, index, errcode, SUBling, level,
@@ -76,9 +79,10 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 
     MPI_Waitsome(TotalReceives, CommunicationReceiveMPI_Request,
 		 &NumberOfCompleteRequests, ListOfIndices, ListOfStatuses);
-//    printf("MPI: %"ISYM" %"ISYM" %"ISYM"\n", TotalReceives, 
-//	   ReceivesCompletedToDate, NumberOfCompleteRequests);
-
+#ifdef DEBUG
+    printf("P(%"ISYM") MPI: %"ISYM" %"ISYM" %"ISYM"\n", MyProcessorNumber,
+	   TotalReceives, ReceivesCompletedToDate, NumberOfCompleteRequests);
+#endif
     CommunicationTime += ReturnWallTime() - time1;
 
     /* Error check */
@@ -143,6 +147,8 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 	  EdgeOffset[dim] = CommunicationReceiveArgument[dim][index];
 	  
 	/* Handle the buffers received, calling the appropriate method. */
+
+	START_LOAD_TIMER;
 
 	switch (CommunicationReceiveCallType[index]) {
 
@@ -280,6 +286,7 @@ int CommunicationReceiveHandler(fluxes **SubgridFluxesEstimate[],
 		  CommunicationReceiveCallType[index])
 
 	} // end: switch on call type
+	END_LOAD_TIMER(grid_one);
 
 	/* Report error if there has been one in any of the above calls. */
 
