@@ -330,6 +330,8 @@ OBJS_CONFIG_LIB = \
         Grid_CollectParticleMassFlaggingField.o \
         Grid_CollectStars.o \
 	Grid_CommunicationMoveGrid.o \
+	Grid_CommunicationMoveGrid1.o \
+	Grid_CommunicationMoveGrid2.o \
 	Grid_CommunicationReceiveRegion.o \
 	Grid_CommunicationSendParticles.o \
 	Grid_CommunicationSendStars.o \
@@ -456,6 +458,7 @@ OBJS_CONFIG_LIB = \
 	Grid_InitializeGravitatingMassField.o \
 	Grid_InitializeGravitatingMassFieldParticles.o \
 	Grid_InitializeUniformGrid.o \
+	Grid_inteuler.o \
 	Grid_InterpolateAccelerations.o \
 	Grid_InterpolateBoundaryFromParent.o \
 	Grid_InterpolateFieldValues.o \
@@ -625,6 +628,7 @@ OBJS_CONFIG_LIB = \
 	intpos.o \
 	intprim.o \
         intvar.o \
+        intvarC.o \
         Isdigit.o \
         KHInitialize.o \
         LevelHierarchy_AddLevel.o \
@@ -720,6 +724,7 @@ OBJS_CONFIG_LIB = \
         RadiationFieldCalculateRates.o \
         RadiationFieldLymanWernerTable.o \
         RadiationFieldUpdate.o \
+	rate_cool_routines.o \
         ReadAllData.o \
         ReadAttr.o \
         ReadEvolveRefineFile.o \
