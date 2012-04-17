@@ -40,8 +40,12 @@ grid::grid()
   GravitatingMassFieldParticlesCellSize = FLOAT_UNDEFINED;
   SubgridsAreStatic                     = FALSE;
   ProcessorNumber                       = ROOT_PROCESSOR;
+  EstimatedCost                         = FLOAT_UNDEFINED;
+  ObservedCost                          = FLOAT_UNDEFINED;
+  ParentCostPerCell                     = FLOAT_UNDEFINED;
+  ParentEstimatedCostPerCell            = FLOAT_UNDEFINED;
 
-  SubgridFluxStorage = new fluxes* [1];
+  SubgridFluxStorage = NULL;//new fluxes* [1];
   NumberOfSubgrids = 1;
  
   /* clear MAX_DIMENSION vectors */

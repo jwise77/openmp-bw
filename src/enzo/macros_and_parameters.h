@@ -555,4 +555,17 @@ typedef int            HDF5_hid_t;
 #define TIME_MSG(A) ;
 #endif
 
+/* Timing macros for load balancing */
+#ifdef USE_MPI
+#define START_GRID_TIMER double _mpi_time = MPI_Wtime();
+#define END_GRID_TIMER this->ObservedCost += MPI_Wtime() - _mpi_time;
+#define START_LOAD_TIMER double _mpi_time = MPI_Wtime();
+#define END_LOAD_TIMER(A) A->AddToCost(MPI_Wtime() - _mpi_time);
+#else
+#define START_GRID_TIMER ;
+#define END_GRID_TIMER ;
+#define START_LOAD_TIMER ;
+#define END_LOAD_TIMER(A) ;
+#endif  
+
 #endif

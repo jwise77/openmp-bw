@@ -68,7 +68,6 @@ int SetBoundaryConditions(HierarchyEntry *Grids[], int NumberOfGrids,
  
   int loopEnd = (ShearingBoundaryDirection != -1) ? 2 : 1;
   
- 
   int grid1, grid2, StartGrid, EndGrid, loop;
   
   LCAPERF_START("SetBoundaryConditions");
@@ -81,7 +80,6 @@ int SetBoundaryConditions(HierarchyEntry *Grids[], int NumberOfGrids,
 #endif
   
    
-
     if (loop == 0) {   
 
       TIME_MSG("Interpolating boundaries from parent");
@@ -211,7 +209,7 @@ int SetBoundaryConditions(HierarchyEntry *Grids[], int NumberOfGrids,
     } // end loop over batchs of grids
 
    // ENDFOR loop (for ShearingBox)
- 
+
     /* c) Apply external reflecting boundary conditions, if needed.  */
 
   for (grid1 = 0; grid1 < NumberOfGrids; grid1++)

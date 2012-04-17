@@ -11,6 +11,10 @@
 /  PURPOSE:
 /
 ************************************************************************/
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
  
 #include <stdio.h>
 #include <string.h>
@@ -24,7 +28,9 @@
 #include "ExternalBoundary.h"
 #include "Grid.h"
 #include "Hierarchy.h"
- 
+
+#define MAX_THREADS 128
+
 int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids, 
 				   int* &NumberToMove, int StartIndex, 
 				   int EndIndex, particle_data* &List, 
@@ -34,6 +40,11 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
 {
  
   /* Declarations. */
+
+#ifdef _OPENMP
+  static int ThreadStart[MAX_THREADS];
+  static int ThreadCount[MAX_THREADS];
+#endif
 
   int i, j, index, dim, n1, grid, proc;
   int i0, j0, k0;
@@ -82,6 +93,7 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
     int *subgrid = NULL;
     subgrid = new int[NumberOfParticles];
 
+#pragma omp parallel for schedule(static) private(i0,j0,k0,index,proc)
     for (i = 0; i < NumberOfParticles; i++) {
 
       /* Compute index of particle position. */
@@ -102,6 +114,14 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
 	 count. */
  
       subgrid[i] = nint(BaryonField[NumberOfBaryonFields][index])-1;
+      if (subgrid[i] < -1 || subgrid[i] > NumberOfSubgrids-1) {
+	ENZO_VFAIL("particle subgrid (%"ISYM"/%"ISYM") out of range\n", 
+		subgrid[i], NumberOfSubgrids)
+      }
+      
+    } // ENDFOR particles
+
+    for (i = 0; i < NumberOfParticles; i++)
       if (subgrid[i] >= 0) {
 	if (KeepLocal)
 	  proc = MyProcessorNumber;
@@ -109,12 +129,6 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
 	  proc = Subgrids[subgrid[i]]->ReturnProcessorNumber();
 	NumberToMove[proc]++;
       }
-      if (subgrid[i] < -1 || subgrid[i] > NumberOfSubgrids-1) {
-	ENZO_VFAIL("particle subgrid (%"ISYM"/%"ISYM") out of range\n", 
-		subgrid[i], NumberOfSubgrids)
-      }
-      
-    } // ENDFOR particles
 
     if (CountOnly == TRUE) {
       delete [] subgrid;
@@ -149,29 +163,100 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
 
       /* Move particles (mark those moved by setting mass = FLOAT_UNDEFINED). */
 
-      n1 = PreviousTotalToMove;
+#pragma omp parallel private(ThreadStart, ThreadCount, n1, i, j, proc, dim)
+    {
 
-      for (i = 0; i < NumberOfParticles; i++) {
-	if (subgrid[i] >= 0) {
-	  if (KeepLocal)
-	    proc = MyProcessorNumber;
-	  else
-	    proc = Subgrids[subgrid[i]]->ReturnProcessorNumber();
-	  for (dim = 0; dim < GridRank; dim++) {
-	    List[n1].pos[dim] = ParticlePosition[dim][i];
-	    List[n1].vel[dim] = ParticleVelocity[dim][i];
+      int nn, move_per_thread;
+      int nmove = TotalToMove - PreviousTotalToMove;
+      int CoresPerProcess = NumberOfCores / NumberOfProcessors;
+      int ThreadNum = 0;
+      bool SingleThread = (CoresPerProcess == 1 || nmove/50 < CoresPerProcess);
+#ifdef _OPENMP
+      ThreadNum = omp_get_thread_num();
+#endif
+
+      // Non-threaded version
+      if (SingleThread) {
+#pragma omp single 
+	{
+	n1 = PreviousTotalToMove;
+	for (i = 0; i < NumberOfParticles; i++) {
+	  if (subgrid[i] >= 0) {
+	    if (KeepLocal)
+	      proc = MyProcessorNumber;
+	    else
+	      proc = Subgrids[subgrid[i]]->ReturnProcessorNumber();
+	    for (dim = 0; dim < GridRank; dim++) {
+	      List[n1].pos[dim] = ParticlePosition[dim][i];
+	      List[n1].vel[dim] = ParticleVelocity[dim][i];
+	    }
+	    List[n1].mass = ParticleMass[i] * MassIncrease;
+	    List[n1].id = ParticleNumber[i];
+	    List[n1].type = ParticleType[i];
+	    for (j = 0; j < NumberOfParticleAttributes; j++)
+	      List[n1].attribute[j] = ParticleAttribute[j][i];
+	    List[n1].grid = subgrid[i];
+	    List[n1].proc = proc;
+	    ParticleMass[i] = FLOAT_UNDEFINED;
+	    n1++;
+	  } // ENDIF move to subgrid
+	} // ENDFOR particles
+	} // END omp single
+      } // ENDIF SingleThread
+
+      // Threaded version
+      else {
+
+	/* Find out how many particles are being moved per thread
+	   block, so we know where to start inserting them in the move
+	   list. */
+
+	move_per_thread = nmove / CoresPerProcess;
+	for (i = 0; i < CoresPerProcess+1; i++)
+	  ThreadCount[i] = 0;
+
+	nn = -1;
+	ThreadStart[0] = 0;
+	for (i = 0; i < NumberOfParticles; i++)
+	  if (subgrid[i] >= 0) {
+	    if (nn == -1)
+	      ThreadStart[++nn] = i;
+	    ThreadCount[nn]++;
+	    if (ThreadCount[nn] == move_per_thread &&
+		nn+1 < CoresPerProcess)
+	      ThreadStart[++nn] = i+1;
 	  }
-	  List[n1].mass = ParticleMass[i] * MassIncrease;
-	  List[n1].id = ParticleNumber[i];
-	  List[n1].type = ParticleType[i];
-	  for (j = 0; j < NumberOfParticleAttributes; j++)
-	    List[n1].attribute[j] = ParticleAttribute[j][i];
-	  List[n1].grid = subgrid[i];
-	  List[n1].proc = proc;
-	  ParticleMass[i] = FLOAT_UNDEFINED;
-	  n1++;
-	} // ENDIF move to subgrid
-      } // ENDFOR particles
+	ThreadStart[CoresPerProcess] = NumberOfParticles;
+
+	n1 = PreviousTotalToMove;
+	for (i = 0; i < ThreadNum; i++) n1 += ThreadCount[i];
+
+	if (ThreadCount[ThreadNum] > 0)
+	  for (i = ThreadStart[ThreadNum]; i < ThreadStart[ThreadNum+1]; i++) {
+	    if (subgrid[i] >= 0) {
+	      if (KeepLocal)
+		proc = MyProcessorNumber;
+	      else
+		proc = Subgrids[subgrid[i]]->ReturnProcessorNumber();
+	      for (dim = 0; dim < GridRank; dim++) {
+		List[n1].pos[dim] = ParticlePosition[dim][i];
+		List[n1].vel[dim] = ParticleVelocity[dim][i];
+	      }
+	      List[n1].mass = ParticleMass[i] * MassIncrease;
+	      List[n1].id = ParticleNumber[i];
+	      List[n1].type = ParticleType[i];
+	      for (j = 0; j < NumberOfParticleAttributes; j++)
+		List[n1].attribute[j] = ParticleAttribute[j][i];
+	      List[n1].grid = subgrid[i];
+	      List[n1].proc = proc;
+	      ParticleMass[i] = FLOAT_UNDEFINED;
+	      n1++;
+	    } // ENDIF move to subgrid
+	  } // ENDFOR particles
+
+      } // ENDELSE SingleThread
+
+    } // END parallel
 
       if (TotalToMove != PreviousTotalToMove)
 	this->CleanUpMovedParticles();
@@ -229,6 +314,9 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
 
     /* Copy this grid's particles to the new space. */
 
+#pragma omp parallel private(dim,j)
+    {
+#pragma omp for nowait schedule(static)
     for (i = 0; i < NumberOfParticles; i++) {
       Mass[i] = ParticleMass[i];
       Number[i] = ParticleNumber[i];
@@ -236,42 +324,46 @@ int grid::TransferSubgridParticles(grid* Subgrids[], int NumberOfSubgrids,
     }
 
     for (dim = 0; dim < GridRank; dim++)
+#pragma omp for nowait schedule(static)
       for (i = 0; i < NumberOfParticles; i++) {
 	Position[dim][i] = ParticlePosition[dim][i];
 	Velocity[dim][i] = ParticleVelocity[dim][i];
       }
 	
     for (j = 0; j < NumberOfParticleAttributes; j++)
+#pragma omp for nowait schedule(static)
       for (i = 0; i < NumberOfParticles; i++)
 	  Attribute[j][i] = ParticleAttribute[j][i];
  
     /* Copy new particles */
 
-    int n = NumberOfParticles;
+    int n;
 
+#pragma omp for nowait schedule(static) private(n)
     for (i = StartIndex; i < EndIndex; i++) {
+      n = NumberOfParticles + i - StartIndex;
       Mass[n] = List[i].mass;
       Number[n] = List[i].id;
       Type[n] = List[i].type;
-      n++;
     }
 
     for (dim = 0; dim < GridRank; dim++) {
-      n = NumberOfParticles;
+#pragma omp for nowait schedule(static) private(n)
       for (i = StartIndex; i < EndIndex; i++) {
+	n = NumberOfParticles + i - StartIndex;
 	Position[dim][n] = List[i].pos[dim];
 	Velocity[dim][n] = List[i].vel[dim];
-	n++;
       }
     }
       
     for (j = 0; j < NumberOfParticleAttributes; j++) {
-      n = NumberOfParticles;
+#pragma omp for nowait schedule(static) private(n)
       for (i = StartIndex; i < EndIndex; i++) {
+	n = NumberOfParticles + i - StartIndex;
 	Attribute[j][n] = List[i].attribute[j];
-	n++;
       }
     }
+    } // ENDIF #pragma parallel
       
     } // ENDIF TotalNumberOfParticles > 0
 
